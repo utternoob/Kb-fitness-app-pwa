@@ -16,9 +16,18 @@ function fitnessApp() {
     currentExIndex: 0,
     isPaused: false,
     repCount: 0,
+    totalSessionReps: 0,
     feedbackMsg: '',
     exerciseState: 'UP',
     tracker: null,
+
+    // Gemini Coach AI State
+    coach: null,
+    aiInsight: '',
+    aiLoading: false,
+    coachQuestion: '',
+    coachAnswer: '',
+    coachChatLoading: false,
 
     // Rest Timer State
     timerActive: false,
@@ -28,6 +37,9 @@ function fitnessApp() {
     initApp() {
       if (typeof initGoogleDriveSync === 'function') {
         initGoogleDriveSync(APP_CONFIG.CLIENT_ID);
+      }
+      if (typeof GeminiCoach !== 'undefined' && APP_CONFIG.GEMINI_API_KEY) {
+        this.coach = new GeminiCoach(APP_CONFIG.GEMINI_API_KEY);
       }
     },
 
@@ -46,6 +58,7 @@ function fitnessApp() {
       this.sessionActive = true;
       this.currentExIndex = 0;
       this.repCount = 0;
+      this.totalSessionReps = 0;
       this.feedbackMsg = 'Align in camera frame...';
       this.exerciseState = 'UP';
       this.isPaused = false;
@@ -59,11 +72,26 @@ function fitnessApp() {
       });
     },
 
-    endSession() {
+    async endSession() {
       if (this.tracker) {
         this.tracker.stop();
       }
       this.sessionActive = false;
+
+      // Trigger Gemini AI Post-Workout Debrief
+      if (this.coach) {
+        this.aiLoading = true;
+        const currentTitle = this.schedule[this.activeDay].title;
+        this.aiInsight = await this.coach.generateWorkoutDebrief(currentTitle, this.completedSets, this.totalSessionReps);
+        this.aiLoading = false;
+      }
+    },
+
+    async askCoach() {
+      if (!this.coachQuestion.trim() || !this.coach) return;
+      this.coachChatLoading = true;
+      this.coachAnswer = await this.coach.askCoachQuestion(this.coachQuestion, this.completedSets);
+      this.coachChatLoading = false;
     },
 
     pauseSession() {
@@ -87,12 +115,14 @@ function fitnessApp() {
 
     nextExercise() {
       const currentList = this.schedule[this.activeDay].mainWorkout;
+      this.totalSessionReps += this.repCount;
+
       if (this.currentExIndex < currentList.length - 1) {
         this.currentExIndex++;
         this.repCount = 0;
         this.feedbackMsg = `Switched to ${this.currentExerciseName()}`;
       } else {
-        alert('Workout session completed! Great job!');
+        alert('Workout session completed! Generating AI Insights...');
         this.endSession();
       }
     },
