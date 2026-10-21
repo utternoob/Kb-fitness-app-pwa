@@ -18,6 +18,7 @@
   <script src="src/data/schedule.js"></script>
   <script src="src/services/driveSync.js"></script>
   <script src="src/services/poseTracker.js"></script>
+  <script src="src/services/geminiCoach.js"></script>
   <script src="src/app.js"></script>
   <style>
     body { background-color: #0f172a; color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; }
@@ -160,6 +161,41 @@
             </div>
           </div>
         </template>
+      </div>
+    </div>
+
+    <!-- AI COACH INSIGHTS & CHAT CARD -->
+    <div class="bg-slate-900/90 rounded-2xl border border-emerald-500/30 p-4 space-y-3 shadow-xl">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+        <span class="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+          <span class="w-2 h-2 rounded-full bg-emerald-400"></span> Gemini AI Coach
+        </span>
+        <span x-show="aiLoading" class="text-[10px] text-amber-300 animate-pulse font-medium">Analyzing Workout...</span>
+      </div>
+
+      <!-- AI Insight Output -->
+      <div x-show="aiInsight" class="text-xs text-slate-300 space-y-1 bg-slate-950 p-3 rounded-xl border border-slate-800 leading-relaxed whitespace-pre-line" x-text="aiInsight"></div>
+
+      <div x-show="!aiInsight && !aiLoading" class="text-xs text-slate-400 italic">
+        Complete a workout session to receive personalized progressive overload recommendations and recovery tips from Gemini AI.
+      </div>
+
+      <!-- Quick Ask Trainer Input -->
+      <div class="pt-2 border-t border-slate-800 space-y-2">
+        <div class="flex gap-2">
+          <input 
+            type="text" 
+            x-model="coachQuestion" 
+            placeholder="Ask coach e.g., 'How to fix swing timing?'" 
+            class="bg-slate-950 text-xs text-slate-200 px-3 py-2 rounded-xl border border-slate-800 flex-1 focus:outline-none focus:border-emerald-500">
+          <button 
+            @click="askCoach()" 
+            class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-3 py-2 rounded-xl text-xs font-bold transition">
+            Ask
+          </button>
+        </div>
+        <div x-show="coachChatLoading" class="text-[10px] text-amber-300 animate-pulse">Consulting Trainer...</div>
+        <div x-show="coachAnswer" class="text-xs text-emerald-300 bg-emerald-950/40 p-2.5 rounded-xl border border-emerald-800/50" x-text="coachAnswer"></div>
       </div>
     </div>
   </div>
