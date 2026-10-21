@@ -4,9 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>KB Fitness App PWA</title>
+  <link rel="manifest" href="manifest.json">
   <script src="https://cdn.tailwindcss.com"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-  <link rel="manifest" href="manifest.json">
   <!-- Google Identity Services SDK -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -87,12 +87,30 @@
             <span class="text-xs font-semibold bg-emerald-950 text-emerald-300 px-2.5 py-1 rounded-md" x-text="ex.reps"></span>
           </div>
 
-          <!-- Form Visual Placeholder -->
-          <div class="w-full h-20 bg-slate-900/60 rounded-xl flex items-center justify-center border border-slate-800/80 text-slate-500">
-            <svg class="w-8 h-8 text-slate-600 stroke-current" fill="none" viewBox="0 0 24 24" stroke-width="1.5">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+          <!-- Dynamic SVG Illustration Box -->
+          <div class="w-full h-28 bg-slate-900/80 rounded-xl flex items-center justify-center border border-slate-800 relative overflow-hidden">
+            <!-- Dynamic Exercise Graphics -->
+            <svg class="w-16 h-16 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <template x-if="ex.icon === 'press'">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 10.5L12 3m0 0l7.5 7.5M12 3v18" />
+              </template>
+              <template x-if="ex.icon === 'pushup'">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3 15h18M3 9h18M6 15v3m12-3v3" />
+              </template>
+              <template x-if="ex.icon === 'squat'">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v18m-6-6h12M6 9h12" />
+              </template>
+              <template x-if="ex.icon === 'plank'">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M2 12h20M5 15h14" />
+              </template>
+              <template x-if="ex.icon === 'swing'">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 3c4.97 0 9 4.03 9 9s-4.03 9-9 9-9-4.03-9-9 4.03-9 9-9zM12 8v8" />
+              </template>
+              <template x-if="ex.icon === 'row'">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 12h16M9 6l-5 6 5 6" />
+              </template>
             </svg>
-            <span class="text-xs text-slate-400 ml-2 font-medium">Form Diagram / Guide</span>
+            <span class="absolute bottom-2 right-3 text-[10px] text-slate-500 uppercase tracking-widest font-bold" x-text="ex.target"></span>
           </div>
 
           <!-- Set Tracker -->
@@ -124,8 +142,6 @@
         completedSets: JSON.parse(localStorage.getItem('kb_completed_sets') || '{}'),
         syncStatus: 'Sync',
         tokenClient: null,
-        
-        // Configured Google OAuth Client ID
         CLIENT_ID: '337366835989-araiqp48nlp7c9bf76me8s3ji7bbs19i.apps.googleusercontent.com',
 
         schedule: [
@@ -141,11 +157,11 @@
               { name: 'Bodyweight Air Squats', durationSec: 45 }
             ],
             mainWorkout: [
-              { name: 'Single-Arm KB Overhead Press', sets: 3, reps: '8 / side', restSec: 60, target: 'Shoulders & Triceps' },
-              { name: 'Push-Ups (Standard or Incline)', sets: 3, reps: '10-12 reps', restSec: 60, target: 'Chest & Core' },
-              { name: 'KB Goblet Thrusters', sets: 3, reps: '8-10 reps', restSec: 60, target: 'Legs & Shoulders' },
-              { name: 'Plank Hold', sets: 3, reps: '45 sec', restSec: 60, target: 'Core' },
-              { name: 'Kettlebell Halo', sets: 3, reps: '10 reps', restSec: 60, target: 'Shoulder Mobility' }
+              { name: 'Single-Arm KB Overhead Press', sets: 3, reps: '8 / side', restSec: 60, target: 'Shoulders & Triceps', icon: 'press' },
+              { name: 'Push-Ups (Standard or Incline)', sets: 3, reps: '10-12 reps', restSec: 60, target: 'Chest & Core', icon: 'pushup' },
+              { name: 'KB Goblet Thrusters', sets: 3, reps: '8-10 reps', restSec: 60, target: 'Legs & Shoulders', icon: 'squat' },
+              { name: 'Plank Hold', sets: 3, reps: '45 sec', restSec: 60, target: 'Core', icon: 'plank' },
+              { name: 'Kettlebell Halo', sets: 3, reps: '10 reps', restSec: 60, target: 'Shoulder Mobility', icon: 'press' }
             ]
           },
           {
@@ -158,10 +174,10 @@
               { name: 'Air Squats', durationSec: 45 }
             ],
             mainWorkout: [
-              { name: 'Two-Handed KB Swings', sets: 4, reps: '15-20 reps', restSec: 90, target: 'Glutes & Hamstrings' },
-              { name: 'KB Goblet Squats', sets: 4, reps: '10-12 reps', restSec: 60, target: 'Quads & Glutes' },
-              { name: 'Bulgarian Split Squats', sets: 3, reps: '8 / leg', restSec: 60, target: 'Single-Leg Balance' },
-              { name: 'KB Romanian Deadlifts', sets: 3, reps: '10-12 reps', restSec: 60, target: 'Posterior Chain' }
+              { name: 'Two-Handed KB Swings', sets: 4, reps: '15-20 reps', restSec: 90, target: 'Glutes & Hamstrings', icon: 'swing' },
+              { name: 'KB Goblet Squats', sets: 4, reps: '10-12 reps', restSec: 60, target: 'Quads & Glutes', icon: 'squat' },
+              { name: 'Bulgarian Split Squats', sets: 3, reps: '8 / leg', restSec: 60, target: 'Single-Leg Balance', icon: 'squat' },
+              { name: 'KB Romanian Deadlifts', sets: 3, reps: '10-12 reps', restSec: 60, target: 'Posterior Chain', icon: 'swing' }
             ]
           },
           {
@@ -173,10 +189,10 @@
               { name: 'Cat-Cow Stretch', durationSec: 45 }
             ],
             mainWorkout: [
-              { name: 'Single-Arm KB Row', sets: 3, reps: '10 / side', restSec: 60, target: 'Lats & Upper Back' },
-              { name: 'Reverse Lunges', sets: 3, reps: '10 / leg', restSec: 60, target: 'Legs & Balance' },
-              { name: 'KB Suitcase Carry', sets: 3, reps: '45 sec / side', restSec: 60, target: 'Obliques & Core' },
-              { name: 'Dead Bug', sets: 3, reps: '12 total', restSec: 60, target: 'Core Stability' }
+              { name: 'Single-Arm KB Row', sets: 3, reps: '10 / side', restSec: 60, target: 'Lats & Upper Back', icon: 'row' },
+              { name: 'Reverse Lunges', sets: 3, reps: '10 / leg', restSec: 60, target: 'Legs & Balance', icon: 'squat' },
+              { name: 'KB Suitcase Carry', sets: 3, reps: '45 sec / side', restSec: 60, target: 'Obliques & Core', icon: 'swing' },
+              { name: 'Dead Bug', sets: 3, reps: '12 total', restSec: 60, target: 'Core Stability', icon: 'plank' }
             ]
           },
           {
@@ -187,10 +203,10 @@
               { name: 'Full Dynamic Warmup', durationSec: 180 }
             ],
             mainWorkout: [
-              { name: 'Kettlebell Swings', sets: 4, reps: '40s Work / 20s Rest', restSec: 20, target: 'Power & Cardio' },
-              { name: 'Mountain Climbers', sets: 4, reps: '40s Work / 20s Rest', restSec: 20, target: 'Core' },
-              { name: 'KB Goblet Sumo Squats', sets: 4, reps: '40s Work / 20s Rest', restSec: 20, target: 'Inner Thighs & Glutes' },
-              { name: 'Bear Crawl Hold', sets: 4, reps: '40s Work / 20s Rest', restSec: 20, target: 'Full Body Tension' }
+              { name: 'Kettlebell Swings', sets: 4, reps: '40s Work / 20s Rest', restSec: 20, target: 'Power & Cardio', icon: 'swing' },
+              { name: 'Mountain Climbers', sets: 4, reps: '40s Work / 20s Rest', restSec: 20, target: 'Core', icon: 'plank' },
+              { name: 'KB Goblet Sumo Squats', sets: 4, reps: '40s Work / 20s Rest', restSec: 20, target: 'Inner Thighs & Glutes', icon: 'squat' },
+              { name: 'Bear Crawl Hold', sets: 4, reps: '40s Work / 20s Rest', restSec: 20, target: 'Full Body Tension', icon: 'plank' }
             ]
           }
         ],
