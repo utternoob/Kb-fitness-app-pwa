@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>KB Fit Tracker PWA</title>
+  <title>KB Fitness App PWA</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
   <!-- Google Identity Services SDK -->
@@ -123,8 +123,9 @@
         completedSets: JSON.parse(localStorage.getItem('kb_completed_sets') || '{}'),
         syncStatus: 'Sync',
         tokenClient: null,
-        // Replace with your Client ID from Google Cloud Console
-        CLIENT_ID: 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com',
+        
+        // Configured Google OAuth Client ID
+        CLIENT_ID: '337366835989-araiqp48nlp7c9bf76me8s3ji7bbs19i.apps.googleusercontent.com',
 
         schedule: [
           {
@@ -243,7 +244,6 @@
           } catch(e) {}
         },
 
-        // Google Drive Integration Logic
         initGoogleDrive() {
           if (window.google) {
             this.tokenClient = google.accounts.oauth2.initTokenClient({
@@ -260,16 +260,20 @@
 
         syncToGoogleDrive() {
           if (!this.tokenClient) {
-            alert('Google Drive SDK initializing or CLIENT_ID needs setup in index.html!');
-            return;
+            this.initGoogleDrive();
           }
-          this.syncStatus = 'Syncing...';
-          this.tokenClient.requestAccessToken({ prompt: '' });
+          if (this.tokenClient) {
+            this.syncStatus = 'Syncing...';
+            this.tokenClient.requestAccessToken({ prompt: '' });
+          } else {
+            alert('Google SDK is still loading. Please try again in a few seconds.');
+          }
         },
 
         async uploadToDrive(accessToken) {
           try {
             const fileData = JSON.stringify({
+              appName: 'kb-fitness-app-pwa',
               lastUpdated: new Date().toISOString(),
               sets: this.completedSets
             });
