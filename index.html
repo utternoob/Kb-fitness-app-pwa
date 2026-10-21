@@ -3,108 +3,177 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>KB Fitness App PWA</title>
+  <title>KB Fit Companion PWA</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://cdn.tailwindcss.com"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-  
+
   <!-- Google Identity Services -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  
+
   <!-- MediaPipe Pose Detection -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
 
-  <!-- Modular Scripts -->
+  <!-- Application Modules -->
   <script src="src/config.js"></script>
   <script src="src/data/schedule.js"></script>
   <script src="src/services/driveSync.js"></script>
   <script src="src/services/poseTracker.js"></script>
-  <script src="src/services/geminiCoach.js"></script>
   <script src="src/app.js"></script>
+  <style>
+    body { background-color: #0f172a; color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; }
+  </style>
 </head>
-<body class="p-4 max-w-md mx-auto bg-slate-900 text-slate-100 font-sans" x-data="fitnessApp()" x-init="initApp()">
+<body class="p-4 max-w-md mx-auto" x-data="fitnessApp()" x-init="initApp()">
 
   <!-- App Header -->
   <header class="flex justify-between items-center mb-6 pt-2">
     <div>
       <h1 class="text-2xl font-bold text-emerald-400">KB Fit Companion</h1>
-      <p class="text-xs text-slate-400">4-Day Kettlebell Program</p>
+      <p class="text-xs text-slate-400">4-Day Kettlebell & Bodyweight Program</p>
     </div>
     <div class="flex space-x-2">
-      <button @click="syncData()" class="p-2 bg-slate-800 rounded-xl border border-slate-700 text-xs text-emerald-400 font-medium flex items-center gap-1">
-        <svg class="w-4 h-4 stroke-current" fill="none" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" /></svg>
+      <!-- Sync Button -->
+      <button @click="syncData()" class="p-2 bg-slate-800 rounded-xl border border-slate-700 text-xs text-emerald-400 font-medium flex items-center gap-1 hover:bg-slate-700 transition">
+        <svg class="w-4 h-4 stroke-current" fill="none" viewBox="0 0 24 24" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+        </svg>
         <span x-text="syncStatus">Sync</span>
       </button>
     </div>
   </header>
 
-  <!-- Camera Modal / Viewfinder for Tracking -->
-  <div x-show="cameraActive" class="mb-6 bg-slate-950 p-3 rounded-2xl border border-emerald-500/40 relative overflow-hidden">
+  <!-- Rest Timer Bar -->
+  <div x-show="timerActive" x-transition class="fixed bottom-4 left-4 right-4 bg-emerald-600 text-white p-4 rounded-2xl shadow-2xl flex justify-between items-center z-50">
+    <div>
+      <p class="text-xs uppercase font-bold tracking-wider opacity-80">Rest Timer</p>
+      <p class="text-3xl font-extrabold" x-text="formatTime(timeLeft)"></p>
+    </div>
+    <div class="space-x-2">
+      <button @click="addTime(10)" class="bg-emerald-700 hover:bg-emerald-800 px-3 py-1.5 rounded-lg text-sm font-bold">+10s</button>
+      <button @click="stopTimer()" class="bg-red-500 hover:bg-red-600 px-3 py-1.5 rounded-lg text-sm font-bold">Skip</button>
+    </div>
+  </div>
+
+  <!-- Camera Vision AI Tracking Overlay -->
+  <div x-show="cameraActive" x-transition class="mb-6 bg-slate-950 p-3 rounded-2xl border border-emerald-500/40 relative overflow-hidden shadow-xl">
     <div class="flex justify-between items-center mb-2">
-      <span class="text-xs font-bold text-emerald-400 uppercase tracking-wider">AI Vision Tracker</span>
-      <button @click="stopCamera()" class="text-xs bg-red-500/20 text-red-400 px-2 py-0.5 rounded font-bold">Close Camera</button>
+      <span class="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> AI Vision Tracker
+      </span>
+      <button @click="stopCamera()" class="text-xs bg-red-500/20 text-red-400 px-2.5 py-1 rounded-lg font-bold hover:bg-red-500/30">Close Camera</button>
     </div>
     
-    <div class="relative w-full h-60 bg-black rounded-xl overflow-hidden flex items-center justify-center">
+    <div class="relative w-full h-64 bg-black rounded-xl overflow-hidden flex items-center justify-center">
       <video id="webcam" class="absolute inset-0 w-full h-full object-cover" autoplay playsinline></video>
       <canvas id="poseCanvas" class="absolute inset-0 w-full h-full"></canvas>
       
-      <!-- Real-time HUD -->
-      <div class="absolute top-2 left-2 bg-slate-900/80 px-3 py-1 rounded-lg border border-slate-700">
-        <p class="text-[10px] text-slate-400 uppercase">Reps</p>
+      <!-- Live HUD Overlays -->
+      <div class="absolute top-2 left-2 bg-slate-900/90 backdrop-blur px-3 py-1.5 rounded-xl border border-slate-700 shadow-md">
+        <p class="text-[10px] text-slate-400 font-semibold uppercase">Reps</p>
         <p class="text-2xl font-black text-emerald-400" x-text="repCount">0</p>
       </div>
 
-      <div class="absolute bottom-2 left-2 right-2 bg-slate-900/90 p-2 rounded-lg border border-slate-700 text-center">
-        <p class="text-xs font-medium text-amber-300" x-text="feedbackMsg || 'Position yourself in frame'"></p>
+      <div class="absolute bottom-2 left-2 right-2 bg-slate-900/90 backdrop-blur p-2 rounded-xl border border-slate-700 text-center shadow-md">
+        <p class="text-xs font-semibold text-amber-300" x-text="feedbackMsg || 'Position yourself in full frame'"></p>
       </div>
     </div>
   </div>
 
-  <!-- Day Selector -->
+  <!-- Day Selector Tabs -->
   <div class="flex space-x-2 mb-6 overflow-x-auto pb-2">
     <template x-for="(day, index) in schedule" :key="day.id">
       <button 
         @click="activeDay = index"
-        :class="activeDay === index ? 'bg-emerald-500 text-slate-950 font-bold' : 'bg-slate-800 text-slate-400'"
-        class="px-4 py-2 rounded-xl text-sm whitespace-nowrap transition-all">
+        :class="activeDay === index ? 'bg-emerald-500 text-slate-950 font-bold shadow-lg shadow-emerald-500/20' : 'bg-slate-800 text-slate-400'"
+        class="px-4 py-2.5 rounded-xl text-sm whitespace-nowrap transition-all">
         <span x-text="'Day ' + (index + 1)"></span>
       </button>
     </template>
   </div>
 
-  <!-- Main Exercises -->
-  <div class="space-y-4">
-    <template x-for="(ex, exIdx) in schedule[activeDay].mainWorkout" :key="ex.name">
-      <div class="bg-slate-800/80 p-4 rounded-2xl border border-slate-700 space-y-3">
-        <div class="flex justify-between items-start">
-          <div>
-            <h4 class="font-bold text-slate-100 text-base" x-text="ex.name"></h4>
-            <p class="text-xs text-slate-400" x-text="ex.target"></p>
-          </div>
-          <button @click="startCamera(ex.type)" class="bg-emerald-950 border border-emerald-500/30 text-emerald-300 text-xs px-2.5 py-1 rounded-lg font-bold flex items-center gap-1">
-            <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/><path fill-rule="evenodd" d="M1.323 11.447C2.811 6.976 7.028 3.75 12 3.75c4.969 0 9.187 3.226 10.677 7.697a1.75 1.75 0 010 1.106C21.187 17.024 16.969 20.25 12 20.25c-4.97 0-9.189-3.226-10.677-7.697a1.75 1.75 0 010-1.106zM12 16.5a4.5 4.5 0 100-9 4.5 4.5 0 000 9z" clip-rule="evenodd"/></svg>
-            Track Form
-          </button>
-        </div>
+  <!-- Active Workout Schedule Card -->
+  <div class="space-y-6">
+    <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700">
+      <h2 class="text-xl font-bold text-slate-100" x-text="schedule[activeDay].title"></h2>
+      <p class="text-xs text-emerald-400 mt-1" x-text="'Est. Duration: ' + schedule[activeDay].durationMin + ' mins'"></p>
+    </div>
 
-        <!-- Set Controls -->
-        <div class="flex items-center justify-between pt-2">
-          <span class="text-xs text-slate-400">Log Sets:</span>
-          <div class="flex space-x-2">
-            <template x-for="setNum in ex.sets" :key="setNum">
-              <button 
-                @click="toggleSet(activeDay, exIdx, setNum)"
-                :class="isSetComplete(activeDay, exIdx, setNum) ? 'bg-emerald-500 text-slate-950 font-bold' : 'bg-slate-700 text-slate-300'"
-                class="w-8 h-8 rounded-lg text-xs">
-                <span x-text="setNum"></span>
+    <!-- Warmup Routine Section -->
+    <div class="bg-slate-900 p-4 rounded-2xl border border-slate-800">
+      <h3 class="text-sm font-bold text-amber-400 uppercase tracking-wider mb-3">🔥 Dynamic Warm-Up</h3>
+      <div class="space-y-2">
+        <template x-for="item in schedule[activeDay].warmup" :key="item.name">
+          <div class="flex items-center justify-between text-sm py-1.5 border-b border-slate-800/80 text-slate-300">
+            <span x-text="item.name"></span>
+            <span class="text-xs bg-slate-800 px-2 py-0.5 rounded text-amber-300 font-medium" x-text="item.durationSec + 's'"></span>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <!-- Main Exercises Circuit -->
+    <div class="space-y-4">
+      <h3 class="text-sm font-bold text-emerald-400 uppercase tracking-wider">💪 Main Workout Circuit</h3>
+      <template x-for="(ex, exIdx) in schedule[activeDay].mainWorkout" :key="ex.name">
+        <div class="bg-slate-800/90 p-4 rounded-2xl border border-slate-700/80 space-y-3">
+          <div class="flex justify-between items-start">
+            <div>
+              <h4 class="font-bold text-slate-100 text-base" x-text="ex.name"></h4>
+              <p class="text-xs text-slate-400" x-text="ex.target"></p>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-semibold bg-emerald-950 text-emerald-300 px-2.5 py-1 rounded-md border border-emerald-800/50" x-text="ex.reps"></span>
+              <button @click="startCamera(ex.icon)" class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs px-2.5 py-1 rounded-md font-bold flex items-center gap-1 transition shadow-md">
+                <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/><path fill-rule="evenodd" d="M1.323 11.447C2.811 6.976 7.028 3.75 12 3.75c4.969 0 9.187 3.226 10.677 7.697a1.75 1.75 0 010 1.106C21.187 17.024 16.969 20.25 12 20.25c-4.97 0-9.189-3.226-10.677-7.697a1.75 1.75 0 010-1.106zM12 16.5a4.5 4.5 0 100-9 4.5 4.5 0 000 9z" clip-rule="evenodd"/></svg>
+                Track
               </button>
-            </template>
+            </div>
+          </div>
+
+          <!-- Built-In Vector Illustration Box -->
+          <div class="w-full h-24 bg-slate-900/90 rounded-xl flex items-center justify-center border border-slate-800 relative overflow-hidden">
+            <svg class="w-12 h-12 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <template x-if="ex.icon === 'press'">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 10.5L12 3m0 0l7.5 7.5M12 3v18" />
+              </template>
+              <template x-if="ex.icon === 'pushup'">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3 15h18M3 9h18M6 15v3m12-3v3" />
+              </template>
+              <template x-if="ex.icon === 'squat'">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v18m-6-6h12M6 9h12" />
+              </template>
+              <template x-if="ex.icon === 'plank'">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M2 12h20M5 15h14" />
+              </template>
+              <template x-if="ex.icon === 'swing'">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 3c4.97 0 9 4.03 9 9s-4.03 9-9 9-9-4.03-9-9 4.03-9 9-9zM12 8v8" />
+              </template>
+              <template x-if="ex.icon === 'row'">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 12h16M9 6l-5 6 5 6" />
+              </template>
+            </svg>
+            <span class="absolute bottom-2 right-3 text-[10px] text-slate-500 uppercase font-bold tracking-wider" x-text="ex.target"></span>
+          </div>
+
+          <!-- Set Logger Buttons -->
+          <div class="flex items-center justify-between pt-1">
+            <span class="text-xs text-slate-400 font-medium">Log Completed Sets:</span>
+            <div class="flex space-x-2">
+              <template x-for="setNum in ex.sets" :key="setNum">
+                <button 
+                  @click="toggleSet(activeDay, exIdx, setNum); startRestTimer(ex.restSec)"
+                  :class="isSetComplete(activeDay, exIdx, setNum) ? 'bg-emerald-500 text-slate-950 font-bold shadow-lg shadow-emerald-500/20' : 'bg-slate-700 text-slate-300'"
+                  class="w-9 h-9 rounded-xl text-sm transition-all flex items-center justify-center">
+                  <span x-text="setNum"></span>
+                </button>
+              </template>
+            </div>
           </div>
         </div>
-      </div>
-    </template>
+      </template>
+    </div>
   </div>
 
 </body>
