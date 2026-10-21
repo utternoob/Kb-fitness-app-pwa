@@ -8,14 +8,12 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 
-  <!-- Google Identity Services -->
+  <!-- Google Identity Services & MediaPipe -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-
-  <!-- MediaPipe Pose Detection -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
 
-  <!-- Application Modules -->
+  <!-- App Modules -->
   <script src="src/config.js"></script>
   <script src="src/data/schedule.js"></script>
   <script src="src/services/driveSync.js"></script>
@@ -25,16 +23,15 @@
     body { background-color: #0f172a; color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; }
   </style>
 </head>
-<body class="p-4 max-w-md mx-auto" x-data="fitnessApp()" x-init="initApp()">
+<body class="p-4 max-w-md mx-auto min-h-screen pb-12" x-data="fitnessApp()" x-init="initApp()">
 
   <!-- App Header -->
   <header class="flex justify-between items-center mb-6 pt-2">
     <div>
-      <h1 class="text-2xl font-bold text-emerald-400">KB Fit Companion</h1>
+      <h1 class="text-2xl font-bold text-emerald-400 tracking-tight">KB Fit Companion</h1>
       <p class="text-xs text-slate-400">4-Day Kettlebell & Bodyweight Program</p>
     </div>
     <div class="flex space-x-2">
-      <!-- Sync Button -->
       <button @click="syncData()" class="p-2 bg-slate-800 rounded-xl border border-slate-700 text-xs text-emerald-400 font-medium flex items-center gap-1 hover:bg-slate-700 transition">
         <svg class="w-4 h-4 stroke-current" fill="none" viewBox="0 0 24 24" stroke-width="2">
           <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
@@ -44,34 +41,36 @@
     </div>
   </header>
 
-  <!-- Rest Timer Bar -->
+  <!-- Rest Timer Floating Overlay -->
   <div x-show="timerActive" x-transition class="fixed bottom-4 left-4 right-4 bg-emerald-600 text-white p-4 rounded-2xl shadow-2xl flex justify-between items-center z-50">
     <div>
       <p class="text-xs uppercase font-bold tracking-wider opacity-80">Rest Timer</p>
       <p class="text-3xl font-extrabold" x-text="formatTime(timeLeft)"></p>
     </div>
     <div class="space-x-2">
-      <button @click="addTime(10)" class="bg-emerald-700 hover:bg-emerald-800 px-3 py-1.5 rounded-lg text-sm font-bold">+10s</button>
-      <button @click="stopTimer()" class="bg-red-500 hover:bg-red-600 px-3 py-1.5 rounded-lg text-sm font-bold">Skip</button>
+      <button @click="addTime(10)" class="bg-emerald-700 hover:bg-emerald-800 px-3 py-1.5 rounded-lg text-sm font-bold transition">+10s</button>
+      <button @click="stopTimer()" class="bg-red-500 hover:bg-red-600 px-3 py-1.5 rounded-lg text-sm font-bold transition">Skip</button>
     </div>
   </div>
 
-  <!-- Camera Vision AI Tracking Overlay -->
-  <div x-show="cameraActive" x-transition class="mb-6 bg-slate-950 p-3 rounded-2xl border border-emerald-500/40 relative overflow-hidden shadow-xl">
-    <div class="flex justify-between items-center mb-2">
-      <span class="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1">
-        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> AI Vision Tracker
-      </span>
-      <button @click="stopCamera()" class="text-xs bg-red-500/20 text-red-400 px-2.5 py-1 rounded-lg font-bold hover:bg-red-500/30">Close Camera</button>
+  <!-- ACTIVE WORKOUT SESSION MODE (Camera HUD + Live Controls) -->
+  <div x-show="sessionActive" x-transition class="space-y-4 mb-8 bg-slate-900 p-4 rounded-2xl border border-emerald-500/40 shadow-2xl">
+    <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+      <div>
+        <span class="text-[10px] bg-emerald-950 text-emerald-300 border border-emerald-800/60 px-2 py-0.5 rounded font-bold uppercase tracking-wider">Live AI Vision Tracker</span>
+        <h3 class="text-lg font-bold text-slate-100 mt-1" x-text="currentExerciseName()"></h3>
+      </div>
+      <button @click="endSession()" class="text-xs bg-red-500/20 text-red-400 px-3 py-1.5 rounded-xl font-bold hover:bg-red-500/30 transition">End Session</button>
     </div>
-    
-    <div class="relative w-full h-64 bg-black rounded-xl overflow-hidden flex items-center justify-center">
+
+    <!-- Video Feed / Canvas Viewport -->
+    <div class="relative w-full h-64 bg-slate-950 rounded-xl overflow-hidden flex items-center justify-center border border-slate-800">
       <video id="webcam" class="absolute inset-0 w-full h-full object-cover" autoplay playsinline></video>
       <canvas id="poseCanvas" class="absolute inset-0 w-full h-full"></canvas>
       
       <!-- Live HUD Overlays -->
       <div class="absolute top-2 left-2 bg-slate-900/90 backdrop-blur px-3 py-1.5 rounded-xl border border-slate-700 shadow-md">
-        <p class="text-[10px] text-slate-400 font-semibold uppercase">Reps</p>
+        <p class="text-[10px] text-slate-400 font-semibold uppercase">Reps Count</p>
         <p class="text-2xl font-black text-emerald-400" x-text="repCount">0</p>
       </div>
 
@@ -79,9 +78,16 @@
         <p class="text-xs font-semibold text-amber-300" x-text="feedbackMsg || 'Position yourself in full frame'"></p>
       </div>
     </div>
+
+    <!-- Active Session Controls -->
+    <div class="grid grid-cols-3 gap-2 pt-1">
+      <button @click="pauseSession()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 py-2.5 rounded-xl text-xs font-bold transition" x-text="isPaused ? 'Resume' : 'Pause'"></button>
+      <button @click="skipExercise()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 py-2.5 rounded-xl text-xs font-bold transition">Skip</button>
+      <button @click="nextExercise()" class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 py-2.5 rounded-xl text-xs font-bold transition">Next Exercise →</button>
+    </div>
   </div>
 
-  <!-- Day Selector Tabs -->
+  <!-- DAY SELECTOR TABS -->
   <div class="flex space-x-2 mb-6 overflow-x-auto pb-2">
     <template x-for="(day, index) in schedule" :key="day.id">
       <button 
@@ -93,86 +99,110 @@
     </template>
   </div>
 
-  <!-- Active Workout Schedule Card -->
-  <div class="space-y-6">
-    <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700">
-      <h2 class="text-xl font-bold text-slate-100" x-text="schedule[activeDay].title"></h2>
-      <p class="text-xs text-emerald-400 mt-1" x-text="'Est. Duration: ' + schedule[activeDay].durationMin + ' mins'"></p>
+  <!-- WORKOUT DASHBOARD -->
+  <div x-show="!sessionActive" class="space-y-6">
+    <!-- Day Overview Card with Start Button -->
+    <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700 flex justify-between items-center shadow-md">
+      <div>
+        <h2 class="text-lg font-bold text-slate-100" x-text="schedule[activeDay].title"></h2>
+        <p class="text-xs text-emerald-400 mt-1" x-text="'Estimated Duration: ' + schedule[activeDay].durationMin + ' mins'"></p>
+      </div>
+      <button @click="startSession()" class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-4 py-3 rounded-xl font-extrabold text-xs tracking-wide uppercase shadow-lg shadow-emerald-500/20 transition flex items-center gap-1.5">
+        <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+        Start Workout
+      </button>
     </div>
 
-    <!-- Warmup Routine Section -->
-    <div class="bg-slate-900 p-4 rounded-2xl border border-slate-800">
-      <h3 class="text-sm font-bold text-amber-400 uppercase tracking-wider mb-3">🔥 Dynamic Warm-Up</h3>
-      <div class="space-y-2">
+    <!-- Collapsible Dynamic Warm-Up Section -->
+    <div class="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
+      <button @click="warmupOpen = !warmupOpen" class="w-full p-4 flex justify-between items-center text-left bg-slate-900/80 hover:bg-slate-800/50 transition">
+        <span class="text-sm font-bold text-amber-400 uppercase tracking-wider">🔥 Dynamic Warm-Up</span>
+        <svg class="w-5 h-5 text-slate-400 transform transition-transform" :class="warmupOpen ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+      </button>
+      <div x-show="warmupOpen" x-transition class="p-4 pt-0 space-y-2">
         <template x-for="item in schedule[activeDay].warmup" :key="item.name">
-          <div class="flex items-center justify-between text-sm py-1.5 border-b border-slate-800/80 text-slate-300">
-            <span x-text="item.name"></span>
-            <span class="text-xs bg-slate-800 px-2 py-0.5 rounded text-amber-300 font-medium" x-text="item.durationSec + 's'"></span>
+          <div class="flex items-center justify-between text-sm py-2 border-b border-slate-800 text-slate-300">
+            <div>
+              <p class="font-medium" x-text="item.name"></p>
+              <p class="text-[11px] text-slate-400" x-text="item.target || 'Full Body Warmup'"></p>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-xs bg-slate-800 px-2.5 py-1 rounded text-amber-300 font-medium" x-text="item.durationSec + 's'"></span>
+              <button @click="openInfo(item)" class="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center font-bold text-xs border border-slate-700 transition">
+                ℹ️
+              </button>
+            </div>
           </div>
         </template>
       </div>
     </div>
 
-    <!-- Main Exercises Circuit -->
-    <div class="space-y-4">
-      <h3 class="text-sm font-bold text-emerald-400 uppercase tracking-wider">💪 Main Workout Circuit</h3>
-      <template x-for="(ex, exIdx) in schedule[activeDay].mainWorkout" :key="ex.name">
-        <div class="bg-slate-800/90 p-4 rounded-2xl border border-slate-700/80 space-y-3">
-          <div class="flex justify-between items-start">
+    <!-- Collapsible Main Workout Circuit -->
+    <div class="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
+      <button @click="mainOpen = !mainOpen" class="w-full p-4 flex justify-between items-center text-left bg-slate-900/80 hover:bg-slate-800/50 transition">
+        <span class="text-sm font-bold text-emerald-400 uppercase tracking-wider">💪 Main Workout Circuit</span>
+        <svg class="w-5 h-5 text-slate-400 transform transition-transform" :class="mainOpen ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+      </button>
+      <div x-show="mainOpen" x-transition class="p-4 pt-0 space-y-3">
+        <template x-for="(ex, exIdx) in schedule[activeDay].mainWorkout" :key="ex.name">
+          <div class="bg-slate-800/90 p-3.5 rounded-xl border border-slate-700/60 flex justify-between items-center">
             <div>
-              <h4 class="font-bold text-slate-100 text-base" x-text="ex.name"></h4>
-              <p class="text-xs text-slate-400" x-text="ex.target"></p>
+              <h4 class="font-bold text-slate-100 text-sm" x-text="ex.name"></h4>
+              <p class="text-xs text-slate-400 mt-0.5" x-text="ex.target + ' • ' + ex.reps"></p>
             </div>
             <div class="flex items-center gap-2">
-              <span class="text-xs font-semibold bg-emerald-950 text-emerald-300 px-2.5 py-1 rounded-md border border-emerald-800/50" x-text="ex.reps"></span>
-              <button @click="startCamera(ex.icon)" class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs px-2.5 py-1 rounded-md font-bold flex items-center gap-1 transition shadow-md">
-                <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/><path fill-rule="evenodd" d="M1.323 11.447C2.811 6.976 7.028 3.75 12 3.75c4.969 0 9.187 3.226 10.677 7.697a1.75 1.75 0 010 1.106C21.187 17.024 16.969 20.25 12 20.25c-4.97 0-9.189-3.226-10.677-7.697a1.75 1.75 0 010-1.106zM12 16.5a4.5 4.5 0 100-9 4.5 4.5 0 000 9z" clip-rule="evenodd"/></svg>
-                Track
+              <button @click="startRestTimer(ex.restSec)" class="text-xs bg-slate-700 hover:bg-slate-600 text-emerald-300 px-2.5 py-1 rounded-lg font-bold border border-slate-600/50 transition">
+                ⏱ <span x-text="ex.restSec + 's'"></span>
+              </button>
+              <button @click="openInfo(ex)" class="w-8 h-8 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 flex items-center justify-center font-bold text-xs border border-slate-600/50 transition">
+                ℹ️
               </button>
             </div>
           </div>
+        </template>
+      </div>
+    </div>
+  </div>
 
-          <!-- Built-In Vector Illustration Box -->
-          <div class="w-full h-24 bg-slate-900/90 rounded-xl flex items-center justify-center border border-slate-800 relative overflow-hidden">
-            <svg class="w-12 h-12 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <template x-if="ex.icon === 'press'">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 10.5L12 3m0 0l7.5 7.5M12 3v18" />
-              </template>
-              <template x-if="ex.icon === 'pushup'">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M3 15h18M3 9h18M6 15v3m12-3v3" />
-              </template>
-              <template x-if="ex.icon === 'squat'">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v18m-6-6h12M6 9h12" />
-              </template>
-              <template x-if="ex.icon === 'plank'">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M2 12h20M5 15h14" />
-              </template>
-              <template x-if="ex.icon === 'swing'">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M12 3c4.97 0 9 4.03 9 9s-4.03 9-9 9-9-4.03-9-9 4.03-9 9-9zM12 8v8" />
-              </template>
-              <template x-if="ex.icon === 'row'">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M4 12h16M9 6l-5 6 5 6" />
-              </template>
-            </svg>
-            <span class="absolute bottom-2 right-3 text-[10px] text-slate-500 uppercase font-bold tracking-wider" x-text="ex.target"></span>
-          </div>
-
-          <!-- Set Logger Buttons -->
-          <div class="flex items-center justify-between pt-1">
-            <span class="text-xs text-slate-400 font-medium">Log Completed Sets:</span>
-            <div class="flex space-x-2">
-              <template x-for="setNum in ex.sets" :key="setNum">
-                <button 
-                  @click="toggleSet(activeDay, exIdx, setNum); startRestTimer(ex.restSec)"
-                  :class="isSetComplete(activeDay, exIdx, setNum) ? 'bg-emerald-500 text-slate-950 font-bold shadow-lg shadow-emerald-500/20' : 'bg-slate-700 text-slate-300'"
-                  class="w-9 h-9 rounded-xl text-sm transition-all flex items-center justify-center">
-                  <span x-text="setNum"></span>
-                </button>
-              </template>
-            </div>
-          </div>
+  <!-- EXERCISE / WARMUP INFO MODAL -->
+  <div x-show="infoModalOpen" x-transition class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-sm w-full p-5 space-y-4 shadow-2xl relative">
+      <div class="flex justify-between items-start">
+        <div>
+          <h3 class="text-lg font-bold text-emerald-400" x-text="activeExerciseModal?.name"></h3>
+          <p class="text-xs text-slate-400" x-text="activeExerciseModal?.target"></p>
         </div>
-      </template>
+        <button @click="infoModalOpen = false" class="text-slate-400 hover:text-white font-bold text-sm">✕</button>
+      </div>
+      
+      <!-- Dynamic SVG Vector Illustrations -->
+      <div class="w-full h-32 bg-slate-950 rounded-xl flex items-center justify-center border border-slate-800 relative">
+        <svg class="w-16 h-16 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <g x-show="activeExerciseModal?.icon === 'press'"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 10.5L12 3m0 0l7.5 7.5M12 3v18" /></g>
+          <g x-show="activeExerciseModal?.icon === 'pushup'"><path stroke-linecap="round" stroke-linejoin="round" d="M3 15h18M3 9h18M6 15v3m12-3v3" /></g>
+          <g x-show="activeExerciseModal?.icon === 'squat'"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v18m-6-6h12M6 9h12" /></g>
+          <g x-show="activeExerciseModal?.icon === 'plank'"><path stroke-linecap="round" stroke-linejoin="round" d="M2 12h20M5 15h14" /></g>
+          <g x-show="activeExerciseModal?.icon === 'swing'"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3c4.97 0 9 4.03 9 9s-4.03 9-9 9-9-4.03-9-9 4.03-9 9-9zM12 8v8" /></g>
+          <g x-show="activeExerciseModal?.icon === 'row'"><path stroke-linecap="round" stroke-linejoin="round" d="M4 12h16M9 6l-5 6 5 6" /></g>
+          <g x-show="activeExerciseModal?.icon === 'arm_circles'"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9 9 0 100-18 9 9 0 000 18zM12 8v8m-4-4h8" /></g>
+          <g x-show="activeExerciseModal?.icon === 'torso_twist'"><path stroke-linecap="round" stroke-linejoin="round" d="M4 8h16M4 16h16M10 3l-4 5 4 5M14 21l4-5-4-5" /></g>
+          <g x-show="activeExerciseModal?.icon === 'cat_cow'"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12c4-4 8-4 12 0s8 4 6 8M6 18v2M18 18v2" /></g>
+          <g x-show="activeExerciseModal?.icon === 'air_squat'"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m-6-6h12M8 8h8" /></g>
+          <g x-show="activeExerciseModal?.icon === 'hip_hinge'"><path stroke-linecap="round" stroke-linejoin="round" d="M4 18l8-10 8 10M12 8v10" /></g>
+          <g x-show="activeExerciseModal?.icon === 'full_warmup'"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></g>
+        </svg>
+      </div>
+
+      <div class="space-y-2 text-xs text-slate-300">
+        <p><strong class="text-emerald-300">Prescription:</strong> <span x-text="activeExerciseModal?.reps || (activeExerciseModal?.durationSec + ' seconds')"></span></p>
+        <p><strong class="text-emerald-300">Instructions:</strong></p>
+        <p class="text-slate-300 leading-relaxed" x-text="activeExerciseModal?.instructions || 'Keep core braced, move with full range of motion, and maintain continuous control.'"></p>
+        <p x-show="activeExerciseModal?.tip" class="text-amber-300 bg-amber-950/40 p-2 rounded-lg border border-amber-800/40">
+          💡 <span x-text="activeExerciseModal?.tip"></span>
+        </p>
+      </div>
+
+      <button @click="infoModalOpen = false" class="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 py-2.5 rounded-xl font-bold text-xs transition">Got It</button>
     </div>
   </div>
 
