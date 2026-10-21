@@ -27,12 +27,16 @@ class PoseTracker {
   }
 
   stop() {
-    if (this.camera) this.camera.stop();
+    if (this.camera) {
+      this.camera.stop();
+    }
   }
 
-  static calculateAngle(a, b, c) {
-    const radians = Math.atan2(c.y - b.y, c.x - b.x) - Math.atan2(a.y - b.y, a.x - b.x);
+  static calculateAngle(p1, p2, p3) {
+    if (!p1 || !p2 || !p3) return 180;
+    const radians = Math.atan2(p3.y - p2.y, p3.x - p2.x) - Math.atan2(p1.y - p2.y, p1.x - p2.x);
     let angle = Math.abs((radians * 180.0) / Math.PI);
-    return angle > 180.0 ? 360 - angle : angle;
+    if (angle > 180.0) angle = 360 - angle;
+    return angle;
   }
 }
