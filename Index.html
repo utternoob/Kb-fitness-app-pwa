@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KB Fit Tracker PWA</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <!-- Google Identity Services SDK -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <style>
+    body { background-color: #0f172a; color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; }
+  </style>
+</head>
+<body class="p-4 max-w-md mx-auto" x-data="fitnessApp()" x-init="initGoogleDrive()">
+
+  <!-- App Header -->
+  <header class="flex justify-between items-center mb-6 pt-2">
+    <div>
+      <h1 class="text-2xl font-bold text-emerald-400">KB Fit Companion</h1>
+      <p class="text-xs text-slate-400">4-Day Kettlebell & Bodyweight Program</p>
+    </div>
+    <div class="flex space-x-2">
+      <!-- Sync Button -->
+      <button @click="syncToGoogleDrive()" class="p-2 bg-slate-800 rounded-xl border border-slate-700 text-xs text-emerald-400 font-medium flex items-center gap-1">
+        <svg class="w-4 h-4 stroke-current" fill="none" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" /></svg>
+        <span x-text="syncStatus">Sync</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Rest Timer Overlay -->
+  <div x-show="timerActive" x-transition class="fixed bottom-4 left-4 right-4 bg-emerald-600 text-white p-4 rounded-2xl shadow-2xl flex justify-between items-center z-50">
+    <div>
+      <p class="text-xs uppercase font-bold tracking-wider">Rest Timer</p>
+      <p class="text-3xl font-extrabold" x-text="formatTime(timeLeft)"></p>
+    </div>
+    <div class="space-x-2">
+      <button @click="addTime(10)" class="bg-emerald-700 px-3 py-1.5 rounded-lg text-sm font-bold">+10s</button>
+      <button @click="stopTimer()" class="bg-red-500 px-3 py-1.5 rounded-lg text-sm font-bold">Skip</button>
+    </div>
+  </div>
+
+  <!-- Day Selector -->
+  <div class="flex space-x-2 mb-6 overflow-x-auto pb-2">
+    <template x-for="(day, index) in schedule" :key="day.id">
+      <button 
+        @click="activeDay = index"
+        :class="activeDay === index ? 'bg-emerald-500 text-slate-950 font-bold' : 'bg-slate-800 text-slate-400'"
+        class="px-4 py-2 rounded-xl text-sm whitespace-nowrap transition-all">
+        <span x-text="'Day ' + (index + 1)"></span>
+      </button>
+    </template>
+  </div>
+
+  <!-- Active Workout Display -->
+  <div class="space-y-6">
+    <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700">
+      <h2 class="text-xl font-bold text-slate-100" x-text="schedule[activeDay].title"></h2>
+      <p class="text-xs text-emerald-400 mt-1" x-text="'Est. Duration: ' + schedule[activeDay].durationMin + ' mins'"></p>
+    </div>
+
+    <!-- Warm Up Section -->
+    <div class="bg-slate-900 p-4 rounded-2xl border border-slate-800">
+      <h3 class="text-sm font-bold text-amber-400 uppercase tracking-wider mb-3">🔥 Dynamic Warm-Up</h3>
+      <div class="space-y-2">
+        <template x-for="item in schedule[activeDay].warmup" :key="item.name">
+          <div class="flex items-center justify-between text-sm py-1 border-b border-slate-800 text-slate-300">
+            <span x-text="item.name"></span>
+            <span class="text-xs bg-slate-800 px-2 py-0.5 rounded text-amber-300" x-text="item.durationSec + 's'"></span>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <!-- Main Workout -->
+    <div class="space-y-4">
+      <h3 class="text-sm font-bold text-emerald-400 uppercase tracking-wider">💪 Main Workout Circuit</h3>
+      <template x-for="(ex, exIdx) in schedule[activeDay].mainWorkout" :key="ex.name">
+        <div class="bg-slate-800/80 p-4 rounded-2xl border border-slate-700 space-y-3">
+          <div class="flex justify-between items-start">
+            <div>
+              <h4 class="font-bold text-slate-100 text-base" x-text="ex.name"></h4>
+              <p class="text-xs text-slate-400" x-text="ex.target"></p>
+            </div>
+            <span class="text-xs font-semibold bg-emerald-950 text-emerald-300 px-2.5 py-1 rounded-md" x-text="ex.reps"></span>
+          </div>
+
+          <!-- Form Visual Placeholder -->
+          <div class="w-full h-20 bg-slate-900/60 rounded-xl flex items-center justify-center border border-slate-800/80 text-slate-500">
+            <svg class="w-8 h-8 text-slate-600 stroke-current" fill="none" viewBox="0 0 24 24" stroke-width="1.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+            </svg>
+            <span class="text-xs text-slate-400 ml-2 font-medium">Form Diagram / Guide</span>
+          </div>
+
+          <!-- Set Tracker -->
+          <div class="flex items-center justify-between pt-2">
+            <span class="text-xs text-slate-400 font-medium">Log Completed Sets:</span>
+            <div class="flex space-x-2">
+              <template x-for="setNum in ex.sets" :key="setNum">
+                <button 
+                  @click="toggleSet(activeDay, exIdx, setNum); startRestTimer(ex.restSec)"
+                  :class="isSetComplete(activeDay, exIdx, setNum) ? 'bg-emerald-500 text-slate-950 font-bold shadow-lg shadow-emerald-500/20' : 'bg-slate-700 text-slate-300'"
+                  class="w-9 h-9 rounded-xl text-sm transition-all flex items-center justify-center">
+                  <span x-text="setNum"></span>
+                </button>
+              </template>
+            </div>
+          </div>
+        </div>
+      </template>
+    </div>
+  </div>
+
+  <script>
+    function fitnessApp() {
+      return {
+        activeDay: 0,
+        timerActive: false,
+        timeLeft: 0,
+        timerInterval: null,
+        completedSets: JSON.parse(localStorage.getItem('kb_completed_sets') || '{}'),
+        syncStatus: 'Sync',
+        tokenClient: null,
+        // Replace with your Client ID from Google Cloud Console
+        CLIENT_ID: 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com',
+
+        schedule: [
+          {
+            id: 'day-1',
+            title: 'Day 1: Upper Body Push & Core Focus',
+            durationMin: 35,
+            warmup: [
+              { name: 'Arm Circles & Cross Hugs', durationSec: 45 },
+              { name: 'Torso Twists / Windmills', durationSec: 45 },
+              { name: 'Cat-Cow Stretch', durationSec: 45 },
+              { name: 'Bodyweight Hip Hinge', durationSec: 45 },
+              { name: 'Bodyweight Air Squats', durationSec: 45 }
+            ],
+            mainWorkout: [
+              { name: 'Single-Arm KB Overhead Press', sets: 3, reps: '8 / side', restSec: 60, target: 'Shoulders & Triceps' },
+              { name: 'Push-Ups (Standard or Incline)', sets: 3, reps: '10-12 reps', restSec: 60, target: 'Chest & Core' },
+              { name: 'KB Goblet Thrusters', sets: 3, reps: '8-10 reps', restSec: 60, target: 'Legs & Shoulders' },
+              { name: 'Plank Hold', sets: 3, reps: '45 sec', restSec: 60, target: 'Core' },
+              { name: 'Kettlebell Halo', sets: 3, reps: '10 reps', restSec: 60, target: 'Shoulder Mobility' }
+            ]
+          },
+          {
+            id: 'day-2',
+            title: 'Day 2: Lower Body & Kettlebell Swings',
+            durationMin: 35,
+            warmup: [
+              { name: 'Torso Twists', durationSec: 45 },
+              { name: 'Hip Hinge / Good Mornings', durationSec: 45 },
+              { name: 'Air Squats', durationSec: 45 }
+            ],
+            mainWorkout: [
+              { name: 'Two-Handed KB Swings', sets: 4, reps: '15-20 reps', restSec: 90, target: 'Glutes & Hamstrings' },
+              { name: 'KB Goblet Squats', sets: 4, reps: '10-12 reps', restSec: 60, target: 'Quads & Glutes' },
+              { name: 'Bulgarian Split Squats', sets: 3, reps: '8 / leg', restSec: 60, target: 'Single-Leg Balance' },
+              { name: 'KB Romanian Deadlifts', sets: 3, reps: '10-12 reps', restSec: 60, target: 'Posterior Chain' }
+            ]
+          },
+          {
+            id: 'day-3',
+            title: 'Day 3: Upper Body Pull & Balance',
+            durationMin: 35,
+            warmup: [
+              { name: 'Arm Circles', durationSec: 45 },
+              { name: 'Cat-Cow Stretch', durationSec: 45 }
+            ],
+            mainWorkout: [
+              { name: 'Single-Arm KB Row', sets: 3, reps: '10 / side', restSec: 60, target: 'Lats & Upper Back' },
+              { name: 'Reverse Lunges', sets: 3, reps: '10 / leg', restSec: 60, target: 'Legs & Balance' },
+              { name: 'KB Suitcase Carry', sets: 3, reps: '45 sec / side', restSec: 60, target: 'Obliques & Core' },
+              { name: 'Dead Bug', sets: 3, reps: '12 total', restSec: 60, target: 'Core Stability' }
+            ]
+          },
+          {
+            id: 'day-4',
+            title: 'Day 4: Full-Body HIIT Circuit',
+            durationMin: 30,
+            warmup: [
+              { name: 'Full Dynamic Warmup', durationSec: 180 }
+            ],
+            mainWorkout: [
+              { name: 'Kettlebell Swings', sets: 4, reps: '40s Work / 20s Rest', restSec: 20, target: 'Power & Cardio' },
+              { name: 'Mountain Climbers', sets: 4, reps: '40s Work / 20s Rest', restSec: 20, target: 'Core' },
+              { name: 'KB Goblet Sumo Squats', sets: 4, reps: '40s Work / 20s Rest', restSec: 20, target: 'Inner Thighs & Glutes' },
+              { name: 'Bear Crawl Hold', sets: 4, reps: '40s Work / 20s Rest', restSec: 20, target: 'Full Body Tension' }
+            ]
+          }
+        ],
+
+        toggleSet(day, ex, set) {
+          const key = `${day}-${ex}-${set}`;
+          this.completedSets[key] = !this.completedSets[key];
+          localStorage.setItem('kb_completed_sets', JSON.stringify(this.completedSets));
+        },
+
+        isSetComplete(day, ex, set) {
+          return !!this.completedSets[`${day}-${ex}-${set}`];
+        },
+
+        startRestTimer(seconds) {
+          clearInterval(this.timerInterval);
+          this.timeLeft = seconds;
+          this.timerActive = true;
+          this.timerInterval = setInterval(() => {
+            if (this.timeLeft > 0) {
+              this.timeLeft--;
+            } else {
+              this.stopTimer();
+              this.playBeep();
+            }
+          }, 1000);
+        },
+
+        stopTimer() {
+          clearInterval(this.timerInterval);
+          this.timerActive = false;
+        },
+
+        addTime(sec) {
+          this.timeLeft += sec;
+        },
+
+        formatTime(seconds) {
+          const m = Math.floor(seconds / 60);
+          const s = seconds % 60;
+          return `${m}:${s < 10 ? '0' : ''}${s}`;
+        },
+
+        playBeep() {
+          try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            osc.connect(ctx.destination);
+            osc.frequency.value = 880;
+            osc.start();
+            osc.stop(ctx.currentTime + 0.3);
+          } catch(e) {}
+        },
+
+        // Google Drive Integration Logic
+        initGoogleDrive() {
+          if (window.google) {
+            this.tokenClient = google.accounts.oauth2.initTokenClient({
+              client_id: this.CLIENT_ID,
+              scope: 'https://www.googleapis.com/auth/drive.appdata',
+              callback: async (resp) => {
+                if (resp.access_token) {
+                  await this.uploadToDrive(resp.access_token);
+                }
+              },
+            });
+          }
+        },
+
+        syncToGoogleDrive() {
+          if (!this.tokenClient) {
+            alert('Google Drive SDK initializing or CLIENT_ID needs setup in index.html!');
+            return;
+          }
+          this.syncStatus = 'Syncing...';
+          this.tokenClient.requestAccessToken({ prompt: '' });
+        },
+
+        async uploadToDrive(accessToken) {
+          try {
+            const fileData = JSON.stringify({
+              lastUpdated: new Date().toISOString(),
+              sets: this.completedSets
+            });
+
+            const metadata = {
+              name: 'kb_workout_history.json',
+              parents: ['appDataFolder']
+            };
+
+            const form = new FormData();
+            form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+            form.append('file', new Blob([fileData], { type: 'application/json' }));
+
+            const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${accessToken}` },
+              body: form
+            });
+
+            if (res.ok) {
+              this.syncStatus = 'Synced ✓';
+              setTimeout(() => { this.syncStatus = 'Sync'; }, 3000);
+            } else {
+              this.syncStatus = 'Error!';
+            }
+          } catch (e) {
+            this.syncStatus = 'Failed';
+          }
+        }
+      }
+    }
+  </script>
+</body>
+</html>
